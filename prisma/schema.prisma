@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url =   env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  CUSTOMER
+  TENANT
+  AGENT
+  ADMIN
+}
+
+enum NotificatioType {
+  INFO
+  WARNING
+  ALERT
+  MESSAGE
+}
+
+enum NotificationStatus {
+  READ
+  UNREAD
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+// User
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  password String
+  role Role
+  createdAt DateTime @default(now())
+  // notifications Notification[]
+
+  customer Customer?
+  tenant Tenant?
+  agent Agent?
+
+  @@unique([id, role])
+}
+
+// Customer
+model Customer {
+  id String @id @default(uuid())
+  email String @unique
+  password String
+  userId String @unique
+  tenantId String // Add this field to link the customer to a tenant
+
+  user User @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tickets Ticket[] // customers create tickets
+  notifications Notification[] // customer receives notifications
+  createdAt DateTime @default(now())
+}
+
+// Tenant
+model Tenant {
+  id String @id @default(uuid())
+  email String @unique
+  password String
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id])
+  customers Customer[]
+  agents Agent[] // Agents work for the tenant
+  tickets Ticket[] // tenants create tickets
+  createdAt DateTime @default(now())
+}
+
+// Agent
+model Agent {
+  id String @id @default(uuid())
+  email String @unique
+  password String
+  userId String @unique
+  tenantId String // Add this field to link the agent to a tenant
+  
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  tickets Ticket[] // agents create tickets
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id String @id @default(uuid())
+  title String
+  description String
+  status TicketStatus @default(OPEN)
+
+  customerId String // Customer who created the ticket
+  tenantId String // Tenant who manages the ticket
+  agentId String? // Agent who is working on the ticket
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  agent Agent? @relation(fields: [agentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Notification
+model Notification {
+  id String @id @default(uuid())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id])
+  type NotificatioType
+  status NotificationStatus
+  message String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
